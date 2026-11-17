@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SysWiki</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1a1a2e; --muted:#6b7280; --sidebar:#f5f6f8; --border:#e5e7eb;
+  --accent:#2563eb; --accent-fg:#ffffff; --code-bg:#f1f5f9; --hover:#eef2ff;
+  --card:#ffffff; --mark:#fde68a; --input-bg:#ffffff; --danger:#dc2626;
+}
+html[data-theme="dark"]{
+  --bg:#0f172a; --fg:#e2e8f0; --muted:#94a3b8; --sidebar:#1e293b; --border:#334155;
+  --accent:#3b82f6; --accent-fg:#ffffff; --code-bg:#1e293b; --hover:#26344b;
+  --card:#1e293b; --mark:#854d0e; --input-bg:#0f172a; --danger:#f87171;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);font-size:15px;line-height:1.6}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--fg);border-radius:6px;padding:6px 10px}
+button:hover{background:var(--hover)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.primary:hover{background:var(--accent);filter:brightness(1.1)}
+input,textarea{font:inherit;color:var(--fg);background:var(--input-bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+
+#app{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+#sidebar{width:290px;min-width:290px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+.sidebar-head h1{font-size:18px;margin:0}
+#themeBtn{border:none;background:transparent;font-size:18px;padding:4px 8px}
+.search-box{padding:10px 12px;border-bottom:1px solid var(--border)}
+.search-box input{width:100%}
+#searchResults{overflow-y:auto;padding:8px 12px;border-bottom:1px solid var(--border)}
+#searchResults.hidden{display:none}
+.search-item{margin-bottom:10px}
+.search-item a{font-weight:600}
+.search-item .snippet{font-size:12px;color:var(--muted)}
+#tree{flex:1;overflow-y:auto;padding:8px 0}
+.tree-group{margin-bottom:4px}
+.tree-cat{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 14px 2px}
+.tree-group ul{list-style:none;margin:0;padding:0}
+.tree-link{display:block;padding:5px 14px;color:var(--fg);border-left:3px solid transparent}
+.tree-link:hover{background:var(--hover);text-decoration:none}
+.tree-link.active{background:var(--hover);border-left-color:var(--accent);font-weight:600}
+.sidebar-foot{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border)}
+.sidebar-foot button{flex:1;font-size:13px}
+
+/* Main */
+#main{flex:1;display:flex;flex-direction:column;min-width:0;height:100%}
+#topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)}
+#menuBtn{display:none}
+#breadcrumb{flex:1;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#breadcrumb .current{color:var(--fg);font-weight:600}
+.top-actions{display:flex;gap:6px}
+#content{flex:1;overflow-y:auto;padding:24px 32px;max-width:960px;width:100%;margin:0 auto}
+
+/* Page view */
+.page-title{font-size:28px;margin:0 0 6px}
+.page-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;font-size:13px;color:var(--muted)}
+.chip{background:var(--hover);color:var(--fg);border-radius:12px;padding:2px 10px;font-size:12px}
+.chip.tag{background:var(--code-bg)}
+.muted{color:var(--muted)}
+
+/* Markdown */
+.markdown h1,.markdown h2,.markdown h3,.markdown h4{border-bottom:1px solid var(--border);padding-bottom:4px;margin:1.2em 0 .5em}
+.markdown h1{font-size:24px}.markdown h2{font-size:20px}.markdown h3{font-size:17px;border-bottom:none}
+.markdown p{margin:.6em 0}
+.markdown code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9em}
+.markdown pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;position:relative}
+.markdown pre code{background:none;padding:0}
+.markdown blockquote{border-left:4px solid var(--accent);margin:.6em 0;padding:2px 14px;color:var(--muted);background:var(--code-bg);border-radius:0 6px 6px 0}
+.markdown table{border-collapse:collapse;width:100%;margin:.8em 0}
+.markdown th,.markdown td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.markdown th{background:var(--code-bg)}
+.markdown img{max-width:100%;border-radius:6px}
+.markdown hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.markdown ul,.markdown ol{padding-left:24px;margin:.5em 0}
+.wiki-link{color:var(--accent)}
+.wiki-link.broken{color:var(--danger);text-decoration:line-through}
+.copy-btn{position:absolute;top:6px;right:6px;font-size:11px;padding:2px 8px;background:var(--card)}
+.attachments,.backlinks{margin-top:24px;border-top:1px solid var(--border);padding-top:12px}
+.attachments h2,.backlinks h2{font-size:15px}
+
+/* Editor */
+.editor{display:flex;flex-direction:column;height:100%}
+.ed-row{display:flex;gap:8px;margin-bottom:8px}
+.ed-title{flex:1;font-size:18px;font-weight:600}
+.ed-cat{width:200px}
+.ed-row2{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.ed-tags{flex:1;min-width:150px}
+.ed-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ed-toolbar button{padding:4px 10px;font-size:13px}
+.ed-toolbar .hint{font-size:12px;color:var(--muted)}
+.ed-toolbar .spacer{flex:1}
+.ed-panes{flex:1;display:flex;gap:0;min-height:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+#edArea{flex:1;border:none;border-radius:0;resize:none;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+#edPreview{flex:1;overflow-y:auto;padding:12px 16px;border-left:1px solid var(--border);background:var(--bg)}
+
+/* Modal */
+#modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50}
+#modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center}
+#modal-backdrop.hidden,#modal.hidden{display:none}
+.modal-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;min-width:320px;max-width:90vw;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.modal-box h3{margin:0 0 12px}
+.modal-btn{display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px}
+.modal-btn:hover{background:var(--hover)}
+
+@media(max-width:800px){
+  #sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s}
+  #sidebar.open{transform:translateX(0)}
+  #menuBtn{display:inline-block}
+  #content{padding:16px}
+  .ed-panes{flex-direction:column}
+  #edPreview{border-left:none;border-top:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-head">
+      <h1>SysWiki</h1>
+      <button id="themeBtn" title="Toggle theme">🌙</button>
+    </div>
+    <div class="search-box"><input id="searchInput" placeholder="Search pages…  (Ctrl+K)"></div>
+    <div id="searchResults" class="hidden"></div>
+    <nav id="tree"></nav>
+    <div class="sidebar-foot">
+      <button id="newPageBtn">+ Page</button>
+      <button id="newCatBtn">+ Category</button>
+    </div>
+  </aside>
+  <main id="main">
+    <header id="topbar">
+      <button id="menuBtn" title="Menu">☰</button>
+      <div id="breadcrumb"></div>
+      <div class="top-actions">
+        <button id="editBtn">Edit</button>
+        <button id="deleteBtn">Delete</button>
+        <button id="exportBtn">Export</button>
+        <button id="importBtn">Import</button>
+      </div>
+    </header>
+    <div id="content"></div>
+  </main>
+</div>
+<div id="modal-backdrop" class="hidden"></div>
+<div id="modal" class="hidden"></div>
+<input type="file" id="attachInput" multiple hidden>
+<input type="file" id="importInput" multiple hidden>
+
+<script>
+"use strict";
+
+/* ============================= helpers ============================= */
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function slugify(s){
+  var r = String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+  return r || ("page-" + Date.now().toString(36));
+}
+function fmtDate(ts){ try{ return new Date(ts).toLocaleString(); }catch(e){ return ""; } }
+function stamp(){
+  var d=new Date(); var p=function(n){return (n<10?"0":"")+n;};
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+"-"+p(d.getHours())+p(d.getMinutes());
+}
+function stripMd(md){
+  return String(md)
+    .replace(/```[\s\S]*?```/g," ")
+    .replace(/`([^`]+)`/g,"$1")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g," ")
+    .replace(/\[\[([^\]|]+)(\|[^\]]+)?\]\]/g,"$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g,"$1")
+    .replace(/[#>*_~\-|]/g," ")
+    .replace(/\s+/g," ");
+}
+function snippet(text,q){
+  var idx=text.toLowerCase().indexOf(q);
+  if(idx<0) return text.slice(0,120);
+  var s=Math.max(0,idx-40);
+  return (s>0?"…":"")+text.slice(s,s+140)+(s+140<text.length?"…":"");
+}
+function highlight(text,q){
+  if(!q) return escapeHtml(text);
+  var idx=text.toLowerCase().indexOf(q);
+  if(idx<0) return escapeHtml(text);
+  return escapeHtml(text.slice(0,idx))+"<mark>"+escapeHtml(text.slice(idx,idx+q.length))+"</mark>"+escapeHtml(text.slice(idx+q.length));
+}
+function download(filename,text,type){
+  var blob=new Blob([text],{type:type||"text/plain"});
+  downloadBlob(blob,filename);
+}
+function downloadBlob(blob,filename){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+}
+function readTextFile(file){ return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(r.result);}; r.onerror=rej; r.readAsText(file); }); }
+function blobToBase64(blob){ return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){res(String(r.result).split(",")[1]);}; r.onerror=rej; r.readAsDataURL(blob); }); }
+function b64ToBlob(b64,type){
+  var bin=atob(b64);var arr=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:type||"application/octet-stream"});
+}
+
+/* ============================= IndexedDB ============================= */
+var DB_NAME="syswiki", DB_VERSION=1, db=null;
+function openDB(){
+  return new Promise(function(resolve,reject){
+    var req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=function(e){
+      var d=e.target.result;
+      if(!d.objectStoreNames.contains("pages")){
+        var s=d.createObjectStore("pages",{keyPath:"id"});
+        s.createIndex("category","category");s.createIndex("updatedAt","updatedAt");
+      }
+      if(!d.objectStoreNames.contains("files")) d.createObjectStore("files",{keyPath:"id"});
+    };
+    req.onsuccess=function(){db=req.result;resolve(db);};
+    req.onerror=function(){reject(req.error);};
+  });
+}
+function tx(store,mode){ return db.transaction(store,mode||"readonly").objectStore(store); }
+function reqP(req){ return new Promise(function(res,rej){ req.onsuccess=function(){res(req.result);}; req.onerror=function(){rej(req.error);}; }); }
+function getAll(store){ return reqP(tx(store).getAll()); }
+function getOne(store,key){ return reqP(tx(store).get(key)); }
+function put(store,val){ return reqP(tx(store,"readwrite").put(val)); }
+function del(store,key){ return reqP(tx(store,"readwrite").delete(key)); }
+function clearStore(store){ return reqP(tx(store,"readwrite").clear()); }
+
+/* ============================= state ============================= */
+var pages=[], titleIndex=new Map(), fileCache=new Map();
+var currentId=null, editingId=null, editingOldTitle="", pendingCategory="", importMode="", attachTarget=null;
+
+function getPage(id){ for(var i=0;i<pages.length;i++) if(pages[i].id===id) return pages[i]; return null; }
+function homePage(){ return getPage("start-here")? "start-here" : (pages[0]?pages[0].id:null); }
+
+function buildTitleIndex(){
+  titleIndex=new Map();
+  for(var i=0;i<pages.length;i++){
+    titleIndex.set(pages[i].title.toLowerCase(),pages[i]);
+    titleIndex.set(pages[i].id,pages[i]);
+  }
+}
+function resolvePage(target){
+  var key=String(target).trim().toLowerCase();
+  if(titleIndex.has(key)) return titleIndex.get(key);
+  var s=slugify(target);
+  if(titleIndex.has(s)) return titleIndex.get(s);
+  return null;
+}
+
+async function loadPages(){
+  pages=await getAll("pages");
+  pages.sort(function(a,b){ return ((a.category||"").localeCompare(b.category||"")) || a.title.localeCompare(b.title); });
+  buildTitleIndex();
+}
+async function refresh(){ await loadPages(); renderTree(); }
+
+/* ============================= markdown ============================= */
+function wikiLinkHtml(target,alias){
+  var page=resolvePage(target);
+  if(page) return '<a class="wiki-link" href="#/page/'+encodeURIComponent(page.id)+'">'+escapeHtml(alias)+'</a>';
+  return '<a class="wiki-link broken" href="#/new/'+encodeURIComponent(target)+'" title="Page not found — click to create">'+escapeHtml(alias)+'</a>';
+}
+function inline(text){
+  var codes=[];
+  text=String(text).replace(/`([^`\n]+)`/g,function(m,c){ codes.push(escapeHtml(c)); return "\u0000C"+(codes.length-1)+"\u0000"; });
+  text=escapeHtml(text);
+  text=text.replace(/\[\[([^\]]+)\]\]/g,function(m,inner){
+    var parts=inner.split("|");
+    var target=(parts[0]||"").trim();
+    var alias=(parts[1]||parts[0]||"").trim();
+    return wikiLinkHtml(target,alias);
+  });
+  text=text.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g,function(m,alt,url){ return '<img src="'+url+'" alt="'+escapeHtml(alt)+'">'; });
+  text=text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,function(m,t,url){ return '<a href="'+url+'" target="_blank" rel="noopener">'+t+'</a>'; });
+  text=text.replace(/\*\*\*([^*]+)\*\*\*/g,"<strong><em>$1</em></strong>");
+  text=text.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  text=text.replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\*)/g,"$1<em>$2</em>");
+  text=text.replace(/(^|[^*\w])_([^_\n]+?)_(?![_\w])/g,"$1<em>$2</em>");
+  text=text.replace(/\u0000C(\d+)\u0000/g,function(m,i){ return "<code>"+codes[i]+"</code>"; });
+  return text;
+}
+function isBlockStart(line){
+  return /^(#{1,6}\s|```|>\s|[-*+]\s|\d+[.)]\s)/.test(line)
+      || /^\s*(---+|\*\*\*+|___+)\s*$/.test(line);
+}
+function isTableHeaderRow(line){ var t=line.trim(); return t.indexOf("|")>=0; }
+function isTableSepRow(line){ return /^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?\s*$/.test(line); }
+function splitRow(line){
+  var s=line.trim();
+  if(s.charAt(0)==="|") s=s.slice(1);
+  if(s.charAt(s.length-1)==="|") s=s.slice(0,-1);
+  return s.split("|").map(function(c){return c.trim();});
+}
+function parseTable(lines,i){
+  var header=splitRow(lines[i]);
+  var aligns=splitRow(lines[i+1]);
+  var j=i+2, rows=[];
+  while(j<lines.length && lines[j].trim().indexOf("|")>=0){ rows.push(splitRow(lines[j])); j++; }
+  function align(k){
+    var a=aligns[k]||"";
+    if(/^:.*:$/.test(a)) return "center";
+    if(/^.*:$/.test(a)) return "right";
+    if(/^:/.test(a)) return "left";
+    return "";
+  }
+  var html="<table><thead><tr>";
+  for(var k=0;k<header.length;k++){
+    var a=align(k);
+    html+="<th"+(a?' style="text-align:'+a+'"':"")+">"+inline(header[k])+"</th>";
+  }
+  html+="</tr></thead><tbody>";
+  for(var r=0;r<rows.length;r++){
+    html+="<tr>";
+    for(var c=0;c<header.length;c++) html+="<td>"+inline(rows[r][c]||"")+"</td>";
+    html+="</tr>";
+  }
+  html+="</tbody></table>";
+  return {html:html,next:j};
+}
+function renderMarkdown(md){
+  var lines=String(md||"").replace(/\r\n/g,"\n").split("\n");
+  var out=[], i=0;
+  while(i<lines.length){
+    var line=lines[i];
+    var fence=line.match(/^```(.*)$/);
+    if(fence){
+      var lang=(fence[1]||"").trim();
+      var buf=[]; i++;
+      while(i<lines.length && !/^```/.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++;
+      out.push("<pre><code"+(lang?' class="lang-'+escapeHtml(lang)+'"':"")+">"+escapeHtml(buf.join("\n"))+"</code></pre>");
+      continue;
+    }
+    var h=line.match(/^(#{1,6})\s+(.*)$/);
+    if(h){ var lvl=h[1].length; out.push("<h"+lvl+">"+inline(h[2])+"</h"+lvl+">"); i++; continue; }
+    if(/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)){ out.push("<hr>"); i++; continue; }
+    if(isTableHeaderRow(line) && i+1<lines.length && isTableSepRow(lines[i+1])){
+      var t=parseTable(lines,i); out.push(t.html); i=t.next; continue;
+    }
+    if(/^\s*>/.test(line)){
+      var qbuf=[];
+      while(i<lines.length && /^\s*>/.test(lines[i])){ qbuf.push(lines[i].replace(/^\s*>\s?/,"")); i++; }
+      out.push("<blockquote>"+renderMarkdown(qbuf.join("\n"))+"</blockquote>");
+      continue;
+    }
+    var ul=line.match(/^\s*[-*+]\s+(.*)$/);
+    var ol=line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if(ul||ol){
+      var isOl=!!ol, lbuf=[];
+      while(i<lines.length){
+        var m=lines[i].match(isOl?/^\s*\d+[.)]\s+(.*)$/:/^\s*[-*+]\s+(.*)$/);
+        if(!m) break;
+        lbuf.push(m[1]); i++;
+      }
+      var tag=isOl?"ol":"ul";
+      out.push("<"+tag+">"+lbuf.map(function(x){return "<li>"+inline(x)+"</li>";}).join("")+"</"+tag+">");
+      continue;
+    }
+    if(line.trim()===""){ i++; continue; }
+    var pbuf=[line]; i++;
+    while(i<lines.length && lines[i].trim()!=="" && !isBlockStart(lines[i]) && !isTableHeaderRow(lines[i])){ pbuf.push(lines[i]); i++; }
+    out.push("<p>"+inline(pbuf.join(" "))+"</p>");
+  }
+  return out.join("\n");
+}
+
+/* ============================= files ============================= */
+async function getFileMeta(id){
+  if(fileCache.has(id)) return fileCache.get(id);
+  var f=await getOne("files",id);
+  if(!f) return null;
+  var meta={name:f.name,type:f.type,blob:f.blob,url:URL.createObjectURL(f.blob)};
+  fileCache.set(id,meta);
+  return meta;
+}
+async function getFileURL(id){ var m=await getFileMeta(id); return m?m.url:""; }
+async function addFile(file){
+  var id="f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  await put("files",{id:id,name:file.name,type:file.type,blob:file});
+  var meta={name:file.name,type:file.type,blob:file,url:URL.createObjectURL(file)};
+  fileCache.set(id,meta);
+  return id;
+}
+async function fixFileRefs(container){
+  var imgs=container.querySelectorAll('img[src^="file:"]');
+  for(var i=0;i<imgs.length;i++){
+    var id=imgs[i].getAttribute("src").slice(5);
+    imgs[i].src=await getFileURL(id);
+  }
+  var as=container.querySelectorAll('a[href^="file:"]');
+  for(var j=0;j<as.length;j++){
+    (function(a){
+      var id=a.getAttribute("href").slice(5);
+      a.href="#"; a.classList.add("attachment-link");
+      a.addEventListener("click",async function(e){
+        e.preventDefault();
+        var meta=await getFileMeta(id);
+        if(meta) downloadBlob(meta.blob,meta.name);
+      });
+    })(as[j]);
+  }
+}
+
+/* ============================= rendering ============================= */
+var el={};
+function $(id){ return document.getElementById(id); }
+function cacheEls(){
+  el.sidebar=$("sidebar"); el.tree=$("tree"); el.content=$("content"); el.breadcrumb=$("breadcrumb");
+  el.searchInput=$("searchInput"); el.searchResults=$("searchResults");
+  el.themeBtn=$("themeBtn"); el.menuBtn=$("menuBtn"); el.editBtn=$("editBtn"); el.deleteBtn=$("deleteBtn");
+  el.exportBtn=$("exportBtn"); el.importBtn=$("importBtn");
+  el.newPageBtn=$("newPageBtn"); el.newCatBtn=$("newCatBtn");
+  el.backdrop=$("modal-backdrop"); el.modal=$("modal");
+  el.attachInput=$("attachInput"); el.importInput=$("importInput");
+}
+
+function renderTree(){
+  var groups=new Map();
+  for(var i=0;i<pages.length;i++){
+    var c=pages[i].category||"Uncategorized";
+    if(!groups.has(c)) groups.set(c,[]);
+    groups.get(c).push(pages[i]);
+  }
+  var cats=Array.from(groups.keys()).sort();
+  var html="";
+  for(var k=0;k<cats.length;k++){
+    var arr=groups.get(cats[k]);
+    html+='<div class="tree-group"><div class="tree-cat">'+escapeHtml(cats[k])+'</div><ul>';
+    for(var j=0;j<arr.length;j++){
+      html+='<li><a href="#/page/'+encodeURIComponent(arr[j].id)+'" class="tree-link'+(arr[j].id===currentId?" active":"")+'">'+escapeHtml(arr[j].title)+'</a></li>';
+    }
+    html+="</ul></div>";
+  }
+  el.tree.innerHTML=html || '<div class="muted" style="padding:12px 14px">No pages yet.</div>';
+}
+
+function updateBreadcrumb(page){
+  var html="";
+  if(page.category) html+='<span class="crumb">'+escapeHtml(page.category)+'</span> / ';
+  html+='<span class="crumb current">'+escapeHtml(page.title)+'</span>';
+  el.breadcrumb.innerHTML=html;
+  document.title=page.title+" — SysWiki";
+}
+
+function computeBacklinks(page){
+  var res=[];
+  var re=/\[\[([^\]]+)\]\]/g;
+  for(var i=0;i<pages.length;i++){
+    var p=pages[i];
+    if(p.id===page.id) continue;
+    var m, found=false;
+    re.lastIndex=0;
+    while((m=re.exec(p.content))){
+      var target=m[1].split("|")[0].trim();
+      var rp=resolvePage(target);
+      if(rp && rp.id===page.id){ found=true; break; }
+    }
+    if(found) res.push(p);
+  }
+  return res;
+}
+
+async function fillAttachments(container,content){
+  var refs=new Set(), m, re=/file:([A-Za-z0-9]+)/g;
+  while((m=re.exec(content))) refs.add(m[1]);
+  if(!refs.size) return;
+  var html='<section class="attachments"><h2>Attachments</h2><ul>';
+  var ids=Array.from(refs);
+  for(var i=0;i<ids.length;i++){
+    var meta=await getFileMeta(ids[i]);
+    if(meta) html+='<li><a class="attachment-link" href="#" data-file="'+ids[i]+'">'+escapeHtml(meta.name)+'</a></li>';
+  }
+  html+="</ul></section>";
+  container.insertAdjacentHTML("beforeend",html);
+  container.querySelectorAll("a.attachment-link[data-file]").forEach(function(a){
+    a.addEventListener("click",async function(e){
+      e.preventDefault();
+      var meta=await getFileMeta(a.getAttribute("data-file"));
+      if(meta) downloadBlob(meta.blob,meta.name);
+    });
+  });
+}
+
+function addCodeCopyButtons(container){
+  container.querySelectorAll("pre").forEach(function(pre){
+    if(pre.querySelector(".copy-btn")) return;
+    var btn=document.createElement("button");
+    btn.className="copy-btn"; btn.textContent="Copy";
+    btn.addEventListener("click",function(){
+      navigator.clipboard.writeText(pre.textContent).then(function(){ btn.textContent="Copied"; setTimeout(function(){btn.textContent="Copy";},1200); });
+    });
+    pre.appendChild(btn);
+  });
+}
+
+async function renderView(page){
+  currentId=page.id;
+  renderTree();
+  updateBreadcrumb(page);
+  var backlinks=computeBacklinks(page);
+  var html='<article class="page">';
+  html+='<h1 class="page-title">'+escapeHtml(page.title)+'</h1>';
+  html+='<div class="page-meta">';
+  if(page.category) html+='<span class="chip">'+escapeHtml(page.category)+'</span>';
+  if(page.tags&&page.tags.length) for(var t=0;t<page.tags.length;t++) html+='<span class="chip tag">'+escapeHtml(page.tags[t])+'</span>';
+  html+='<span class="muted">Updated '+escapeHtml(fmtDate(page.updatedAt))+'</span>';
+  html+='</div>';
+  html+='<div class="markdown">'+renderMarkdown(page.content)+'</div>';
+  if(backlinks.length){
+    html+='<section class="backlinks"><h2>Backlinks</h2><ul>';
+    for(var b=0;b<backlinks.length;b++) html+='<li><a href="#/page/'+encodeURIComponent(backlinks[b].id)+'">'+escapeHtml(backlinks[b].title)+'</a></li>';
+    html+="</ul></section>";
+  }
+  html+="</article>";
+  el.content.innerHTML=html;
+  await fixFileRefs(el.content);
+  await fillAttachments(el.content,page.content);
+  addCodeCopyButtons(el.content);
+}
+
+function editorHTML(){
+  return '<div class="editor">'
+    +'<div class="ed-row"><input id="edTitle" class="ed-title" placeholder="Page title"><input id="edCategory" class="ed-cat" placeholder="Category (e.g. Manual)"></div>'
+    +'<div class="ed-row2"><input id="edTags" class="ed-tags" placeholder="tags, comma, separated"><div class="ed-toolbar">'
+    +'<button id="edBold" title="Bold"><b>B</b></button>'
+    +'<button id="edItalic" title="Italic"><i>I</i></button>'
+    +'<button id="edCode" title="Inline code">&lt;/&gt;</button>'
+    +'<button id="edAttach" title="Attach image/file">Attach</button>'
+    +'<span class="hint">Markdown + [[WikiLink]]</span><span class="spacer"></span>'
+    +'<button id="edSave" class="primary">Save</button><button id="edCancel">Cancel</button>'
+    +'</div></div>'
+    +'<div class="ed-panes"><textarea id="edArea" spellcheck="false"></textarea><div id="edPreview" class="markdown"></div></div>'
+    +'</div>';
+}
+
+function renderEditor(id,prefillTitle,prefillCategory){
+  editingId=id||null;
+  var page=id?getPage(id):null;
+  editingOldTitle=page?page.title:"";
+  el.content.innerHTML=editorHTML();
+  var t=$("edTitle"),c=$("edCategory"),tg=$("edTags"),area=$("edArea"),prev=$("edPreview");
+  t.value=page?page.title:(prefillTitle||"");
+  c.value=page?page.category:(prefillCategory||"");
+  tg.value=(page&&page.tags)?page.tags.join(", "):"";
+  area.value=page?page.content:"";
+  function renderPreview(){ prev.innerHTML=renderMarkdown(area.value); fixFileRefs(prev); }
+  renderPreview();
+  area.addEventListener("input",renderPreview);
+  $("edSave").addEventListener("click",saveEditor);
+  $("edCancel").addEventListener("click",function(){ var hp=homePage(); if(id) go(id); else if(hp) go(hp); });
+  $("edAttach").addEventListener("click",openAttach);
+  $("edBold").addEventListener("click",function(){ wrapSelection("**","**"); });
+  $("edItalic").addEventListener("click",function(){ wrapSelection("*","*"); });
+  $("edCode").addEventListener("click",function(){ wrapSelection("`","`"); });
+  el.breadcrumb.innerHTML='<span class="crumb current">'+(page?("Editing — "+escapeHtml(page.title)):"New page")+'</span>';
+  document.title="Editing — SysWiki";
+}
+
+function wrapSelection(prefix,suffix){
+  var area=$("edArea");
+  var s=area.selectionStart,e=area.selectionEnd;
+  var sel=area.value.substring(s,e)||"text";
+  area.setRangeText(prefix+sel+suffix,s,e,"end");
+  area.focus();
+  area.dispatchEvent(new Event("input"));
+}
+
+async function saveEditor(){
+  var t=$("edTitle"),c=$("edCategory"),tg=$("edTags"),area=$("edArea");
+  var title=t.value.trim();
+  if(!title){ alert("Title is required."); return; }
+  var content=area.value;
+  var category=c.value.trim();
+  var tags=tg.value.split(",").map(function(x){return x.trim();}).filter(Boolean);
+  var now=Date.now();
+  var id, createdAt=now;
+  if(editingId){
+    id=editingId;
+    var old=getPage(id);
+    if(old) createdAt=old.createdAt;
+    if(old && old.title!==title) await rewriteLinks(old.title,title);
+  }else{
+    id=slugify(title);
+    if(getPage(id)) id=id+"-"+Date.now().toString(36);
+  }
+  await put("pages",{id:id,title:title,content:content,category:category,tags:tags,createdAt:createdAt,updatedAt:now});
+  await refresh();
+  go(id);
+}
+
+async function rewriteLinks(oldTitle,newTitle){
+  for(var i=0;i<pages.length;i++){
+    var p=pages[i];
+    if(p.content.indexOf("[["+oldTitle)<0) continue;
+    p.content=p.content.split("[["+oldTitle).join("[["+newTitle);
+    await put("pages",p);
+  }
+}
+
+async function deleteCurrentPage(){
+  if(!currentId) return;
+  var p=getPage(currentId);
+  if(!p) return;
+  if(!confirm('Delete page "'+p.title+'"? This cannot be undone.')) return;
+  await del("pages",p.id);
+  await refresh();
+  var hp=homePage();
+  if(hp) go(hp); else location.hash="#/";
+}
+
+/* ============================= routing ============================= */
+function go(id){ location.hash="#/page/"+encodeURIComponent(id); }
+function handleRoute(){
+  var h=decodeURIComponent(location.hash||"#/").replace(/^#\/?/,"");
+  var parts=h.split("/").filter(Boolean);
+  if(parts.length===0){
+    var hp=homePage();
+    if(hp){ currentId=hp; renderView(getPage(hp)); } else { el.content.innerHTML="<p>No pages yet. Create one from the sidebar.</p>"; }
+    return;
+  }
+  if(parts[0]==="page" && parts[2]==="edit" && parts[1]){
+    var pe=getPage(parts[1]);
+    if(pe){ currentId=pe.id; renderTree(); renderEditor(pe.id); } else { el.content.innerHTML="<p>Page not found.</p>"; }
+    return;
+  }
+  if(parts[0]==="page" && parts[1]){
+    var p=getPage(parts[1]);
+    if(p){ currentId=p.id; renderView(p); } else { el.content.innerHTML="<p>Page not found.</p>"; }
+    return;
+  }
+  if(parts[0]==="new"){
+    currentId=null;
+    renderTree();
+    renderEditor(null,parts[1]||"",pendingCategory);
+    pendingCategory="";
+    return;
+  }
+  var hp2=homePage();
+  if(hp2) go(hp2);
+}
+
+/* ============================= search ============================= */
+function doSearch(){
+  var q=el.searchInput.value.trim().toLowerCase();
+  if(!q){
+    el.searchResults.classList.add("hidden");
+    el.searchResults.innerHTML="";
+    el.tree.style.display="";
+    return;
+  }
+  el.tree.style.display="none";
+  el.searchResults.classList.remove("hidden");
+  var matches=[];
+  for(var i=0;i<pages.length;i++){
+    var p=pages[i];
+    if(p.title.toLowerCase().indexOf(q)>=0 || stripMd(p.content).toLowerCase().indexOf(q)>=0) matches.push(p);
+  }
+  var html="";
+  for(var j=0;j<matches.length;j++){
+    var m=matches[j];
+    html+='<div class="search-item"><a href="#/page/'+encodeURIComponent(m.id)+'">'+highlight(m.title,q)+'</a>'
+        +'<div class="snippet">'+highlight(snippet(stripMd(m.content),q),q)+'</div></div>';
+  }
+  el.searchResults.innerHTML=html||'<div class="muted">No results</div>';
+}
+
+/* ============================= export / import ============================= */
+function currentPage(){ return currentId?getPage(currentId):null; }
+
+function exportPageMd(){
+  var p=currentPage(); if(!p) return;
+  download(p.title+".md",p.content,"text/markdown");
+}
+function exportPageHtml(){
+  var p=currentPage(); if(!p) return;
+  var css="body{font-family:sans-serif;line-height:1.6;max-width:800px;margin:24px auto;padding:0 16px;color:#1a1a2e}"
+    +"pre{background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto}code{background:#f1f5f9;padding:1px 4px;border-radius:4px}"
+    +"table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}blockquote{border-left:4px solid #2563eb;padding:2px 14px;color:#555}";
+  var html="<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>"+escapeHtml(p.title)+"</title><style>"+css+"</style></head><body>"
+    +"<h1>"+escapeHtml(p.title)+"</h1>"+renderMarkdown(p.content)+"</body></html>";
+  download(p.title+".html",html,"text/html");
+}
+async function exportWiki(){
+  var ps=await getAll("pages");
+  var fs=await getAll("files");
+  var files={};
+  for(var i=0;i<fs.length;i++){
+    files[fs[i].id]={name:fs[i].name,type:fs[i].type,data:await blobToBase64(fs[i].blob)};
+  }
+  var data={app:"syswiki",version:1,exportedAt:new Date().toISOString(),pages:ps,files:files};
+  download("syswiki-backup-"+stamp()+".json",JSON.stringify(data,null,2),"application/json");
+}
+
+async function importTextFiles(files){
+  var now=Date.now();
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    var text=await readTextFile(f);
+    var title=f.name.replace(/\.[^.]+$/,"")||f.name;
+    var id=slugify(title);
+    if(getPage(id)) id=id+"-"+Date.now().toString(36);
+    await put("pages",{id:id,title:title,content:text,category:"Imported",tags:[],createdAt:now,updatedAt:now});
+  }
+  await refresh();
+  go(homePage());
+}
+async function importJson(file,replace){
+  var text=await readTextFile(file);
+  var data;
+  try{ data=JSON.parse(text); }catch(e){ alert("Invalid JSON file."); return; }
+  if(replace){ await clearStore("pages"); await clearStore("files"); fileCache.clear(); }
+  if(data.pages) for(var i=0;i<data.pages.length;i++) await put("pages",data.pages[i]);
+  if(data.files){
+    var ids=Object.keys(data.files);
+    for(var j=0;j<ids.length;j++){
+      var f=data.files[ids[j]];
+      await put("files",{id:ids[j],name:f.name,type:f.type,blob:b64ToBlob(f.data,f.type)});
+    }
+  }
+  await refresh();
+  go(homePage());
+}
+
+/* ============================= modal ============================= */
+function showModal(title,items){
+  el.backdrop.classList.remove("hidden");
+  el.modal.classList.remove("hidden");
+  var html='<div class="modal-box"><h3>'+escapeHtml(title)+'</h3>';
+  for(var i=0;i<items.length;i++) html+='<button class="modal-btn" data-action="'+items[i].action+'">'+escapeHtml(items[i].label)+'</button>';
+  html+='<button class="modal-btn" data-action="close">Cancel</button></div>';
+  el.modal.innerHTML=html;
+}
+function hideModal(){
+  el.backdrop.classList.add("hidden");
+  el.modal.classList.add("hidden");
+  el.modal.innerHTML="";
+}
+var modalActions={
+  exportPageMd:exportPageMd,
+  exportPageHtml:exportPageHtml,
+  exportWiki:exportWiki,
+  importFiles:function(){ importMode="files"; el.importInput.accept=".md,.txt,.markdown,.text,text/plain"; el.importInput.click(); },
+  importJsonMerge:function(){ importMode="json-merge"; el.importInput.accept=".json,application/json"; el.importInput.click(); },
+  importJsonReplace:function(){ importMode="json-replace"; el.importInput.accept=".json,application/json"; el.importInput.click(); }
+};
+
+/* ============================= theme ============================= */
+function initTheme(){
+  var saved=null;
+  try{ saved=localStorage.getItem("syswiki.theme"); }catch(e){}
+  if(!saved){
+    saved=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";
+  }
+  document.documentElement.dataset.theme=saved;
+  updateThemeBtn();
+}
+function updateThemeBtn(){ el.themeBtn.textContent=document.documentElement.dataset.theme==="dark"?"☀️":"🌙"; }
+function toggleTheme(){
+  var cur=document.documentElement.dataset.theme==="dark"?"light":"dark";
+  document.documentElement.dataset.theme=cur;
+  try{ localStorage.setItem("syswiki.theme",cur); }catch(e){}
+  updateThemeBtn();
+}
+
+/* ============================= seed ============================= */
+async function seed(){
+  var now=Date.now();
+  var seeds=[
+    {id:"start-here",title:"Start Here",category:"",tags:[],content:
+      "# Welcome to SysWiki\n\nThis is your offline system documentation wiki. Everything is stored locally in your browser (IndexedDB) and works with no internet connection.\n\n## Getting around\n- Browse pages by category in the sidebar.\n- Search with `Ctrl/Cmd + K`.\n- Click **Edit** to modify a page using Markdown.\n\n## Link between pages\nUse wiki links like [[System Manual]], [[Servers]], [[Accounts]], [[Common Commands]] and [[Login Links]].\n\n## Tips\n- Attach images or files with the **Attach** button while editing.\n- Export / import individual pages or the whole wiki from the top bar."},
+    {id:"system-manual",title:"System Manual",category:"Manual",tags:["manual"],content:
+      "# System Manual\n\n## Overview\nDescribe the system architecture and purpose here.\n\n## Architecture\n- Component A — responsible for ...\n- Component B — responsible for ...\n\n## Procedures\n1. Step one\n2. Step two\n3. Step three\n\n> Note: keep related details in [[Servers]] and [[Common Commands]]."},
+    {id:"servers",title:"Servers",category:"Infrastructure",tags:["server"],content:
+      "# Servers\n\n| Name | Host | IP | Role | OS |\n|------|------|----|------|----|\n| web-01 | example | 10.0.0.1 | web | Ubuntu |\n| db-01 | example | 10.0.0.2 | database | Ubuntu |\n\n## Notes\nSee [[Login Links]] for access URLs and [[Common Commands]] for operations."},
+    {id:"accounts",title:"Accounts",category:"Security",tags:["account"],content:
+      "# Accounts\n\n> Store credentials securely. Do not commit secrets.\n\n| Service | Username | Notes |\n|---------|----------|-------|\n| admin console | admin | change password |\n| database | dbadmin | restricted |\n\n## Rotation policy\n- Rotate every 90 days\n- See [[Common Commands]] for SSH access"},
+    {id:"common-commands",title:"Common Commands",category:"Reference",tags:["commands"],content:
+      "# Common Commands\n\n## System\n```bash\nsystemctl status <service>\njournalctl -u <service> -f\ndf -h\n```\n\n## Network\n```bash\nss -tulpn\ncurl -I https://example.com\n```\n\n## Database\n```sql\nSELECT * FROM users LIMIT 10;\n```"},
+    {id:"login-links",title:"Login Links",category:"Reference",tags:["links"],content:
+      "# Login Links\n\n- Admin console: `https://...`\n- Monitoring: `https://...`\n- CI/CD: `https://...`\n\nSee [[Accounts]] for credentials and [[System Manual]] for context."}
+  ];
+  for(var i=0;i<seeds.length;i++){
+    var s=seeds[i];
+    await put("pages",{id:s.id,title:s.title,content:s.content,category:s.category,tags:s.tags,createdAt:now,updatedAt:now});
+  }
+}
+
+/* ============================= events ============================= */
+function bindEvents(){
+  el.menuBtn.addEventListener("click",function(){ el.sidebar.classList.toggle("open"); });
+  el.themeBtn.addEventListener("click",toggleTheme);
+  el.editBtn.addEventListener("click",function(){ if(currentId) location.hash="#/page/"+encodeURIComponent(currentId)+"/edit"; });
+  el.deleteBtn.addEventListener("click",deleteCurrentPage);
+  el.exportBtn.addEventListener("click",function(){ showModal("Export",[
+    {label:"Export this page as Markdown (.md)",action:"exportPageMd"},
+    {label:"Export this page as HTML (.html)",action:"exportPageHtml"},
+    {label:"Export entire wiki (JSON backup)",action:"exportWiki"}
+  ]); });
+  el.importBtn.addEventListener("click",function(){ showModal("Import",[
+    {label:"Import Markdown / text files as pages",action:"importFiles"},
+    {label:"Import wiki JSON — merge",action:"importJsonMerge"},
+    {label:"Import wiki JSON — replace all",action:"importJsonReplace"}
+  ]); });
+  el.newPageBtn.addEventListener("click",function(){ location.hash="#/new"; });
+  el.newCatBtn.addEventListener("click",function(){
+    var cat=prompt("New category name:");
+    if(cat===null) return;
+    pendingCategory=cat.trim();
+    location.hash="#/new";
+  });
+  el.searchInput.addEventListener("input",doSearch);
+  el.modal.addEventListener("click",function(e){
+    var b=e.target.closest("[data-action]");
+    if(!b) return;
+    var a=b.dataset.action;
+    if(a==="close"){ hideModal(); return; }
+    hideModal();
+    if(modalActions[a]) modalActions[a]();
+  });
+  el.backdrop.addEventListener("click",hideModal);
+  el.attachInput.addEventListener("change",async function(){
+    var files=Array.prototype.slice.call(el.attachInput.files);
+    el.attachInput.value="";
+    if(!files.length) return;
+    var tokens=[];
+    for(var i=0;i<files.length;i++){
+      var id=await addFile(files[i]);
+      if(files[i].type.indexOf("image/")===0) tokens.push("![](file:"+id+")");
+      else tokens.push("["+files[i].name+"](file:"+id+")");
+    }
+    var md=tokens.join("\n");
+    if(attachTarget){
+      var pos=attachTarget.selectionStart;
+      attachTarget.setRangeText(md,pos,attachTarget.selectionEnd,"end");
+      attachTarget.dispatchEvent(new Event("input"));
+    }
+    attachTarget=null;
+  });
+  el.importInput.addEventListener("change",async function(){
+    var files=Array.prototype.slice.call(el.importInput.files);
+    el.importInput.value="";
+    if(!files.length) return;
+    if(importMode==="files") await importTextFiles(files);
+    else if(importMode==="json-merge") await importJson(files[0],false);
+    else if(importMode==="json-replace") await importJson(files[0],true);
+  });
+  window.addEventListener("hashchange",handleRoute);
+  document.addEventListener("keydown",function(e){
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); el.searchInput.focus(); }
+  });
+}
+
+function openAttach(){
+  attachTarget=$("edArea");
+  el.attachInput.accept="*/*";
+  el.attachInput.click();
+}
+
+/* ============================= init ============================= */
+async function init(){
+  await openDB();
+  cacheEls();
+  initTheme();
+  await loadPages();
+  if(pages.length===0) await seed();
+  await loadPages();
+  renderTree();
+  bindEvents();
+  if(location.hash && location.hash!=="#") handleRoute();
+  else{ var hp=homePage(); if(hp) go(hp); else handleRoute(); }
+}
+init().catch(function(err){ document.body.innerHTML="<pre style='padding:24px'>Failed to initialise: "+escapeHtml(err&&err.message?err.message:String(err))+"</pre>"; });
+</script>
+</body>
+</html>
