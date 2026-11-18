@@ -32,7 +32,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 /* Sidebar */
 #sidebar{width:290px;min-width:290px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%}
 .sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
-.sidebar-head h1{font-size:18px;margin:0}
+.sidebar-head h1{font-size:18px;margin:0;flex:1;cursor:pointer;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-head h1:hover{color:var(--accent)}
+.wiki-title-input{font:inherit;font-size:18px;font-weight:700;width:100%;padding:2px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--input-bg);color:var(--fg)}
 #themeBtn{border:none;background:transparent;font-size:18px;padding:4px 8px}
 .search-box{padding:10px 12px;border-bottom:1px solid var(--border)}
 .search-box input{width:100%}
@@ -101,6 +103,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .ed-panes{flex:1;display:flex;gap:0;min-height:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 #edArea{flex:1;border:none;border-radius:0;resize:none;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
 #edPreview{flex:1;overflow-y:auto;padding:12px 16px;border-left:1px solid var(--border);background:var(--bg)}
+.ed-panes.hide-preview #edPreview{display:none}
 
 /* Modal */
 #modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50}
@@ -125,7 +128,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 <div id="app">
   <aside id="sidebar">
     <div class="sidebar-head">
-      <h1>SysWiki</h1>
+      <h1 id="wikiTitle" title="Click to rename">SysWiki</h1>
       <button id="themeBtn" title="Toggle theme">🌙</button>
     </div>
     <div class="search-box"><input id="searchInput" placeholder="Search pages…  (Ctrl+K)"></div>
@@ -424,6 +427,7 @@ function cacheEls(){
   el.newPageBtn=$("newPageBtn"); el.newCatBtn=$("newCatBtn");
   el.backdrop=$("modal-backdrop"); el.modal=$("modal");
   el.attachInput=$("attachInput"); el.importInput=$("importInput");
+  el.wikiTitle=$("wikiTitle");
 }
 
 function renderTree(){
@@ -451,7 +455,7 @@ function updateBreadcrumb(page){
   if(page.category) html+='<span class="crumb">'+escapeHtml(page.category)+'</span> / ';
   html+='<span class="crumb current">'+escapeHtml(page.title)+'</span>';
   el.breadcrumb.innerHTML=html;
-  document.title=page.title+" — SysWiki";
+  document.title=page.title+" — "+wikiName();
 }
 
 function computeBacklinks(page){
@@ -537,11 +541,14 @@ function editorHTML(){
     +'<button id="edBold" title="Bold"><b>B</b></button>'
     +'<button id="edItalic" title="Italic"><i>I</i></button>'
     +'<button id="edCode" title="Inline code">&lt;/&gt;</button>'
+    +'<button id="edImage" title="Insert image">Image</button>'
     +'<button id="edAttach" title="Attach image/file">Attach</button>'
+    +'<button id="edPasteTable" title="Convert clipboard cells (Excel/Sheets) to a table">Paste table</button>'
     +'<span class="hint">Markdown + [[WikiLink]]</span><span class="spacer"></span>'
+    +'<button id="edTogglePreview" title="Toggle preview pane">Hide Preview</button>'
     +'<button id="edSave" class="primary">Save</button><button id="edCancel">Cancel</button>'
     +'</div></div>'
-    +'<div class="ed-panes"><textarea id="edArea" spellcheck="false"></textarea><div id="edPreview" class="markdown"></div></div>'
+    +'<div class="ed-panes" id="edPanes"><textarea id="edArea" spellcheck="false"></textarea><div id="edPreview" class="markdown"></div></div>'
     +'</div>';
 }
 
@@ -550,22 +557,40 @@ function renderEditor(id,prefillTitle,prefillCategory){
   var page=id?getPage(id):null;
   editingOldTitle=page?page.title:"";
   el.content.innerHTML=editorHTML();
-  var t=$("edTitle"),c=$("edCategory"),tg=$("edTags"),area=$("edArea"),prev=$("edPreview");
+  var t=$("edTitle"),c=$("edCategory"),tg=$("edTags"),area=$("edArea"),prev=$("edPreview"),panes=$("edPanes");
   t.value=page?page.title:(prefillTitle||"");
   c.value=page?page.category:(prefillCategory||"");
   tg.value=(page&&page.tags)?page.tags.join(", "):"";
   area.value=page?page.content:"";
-  function renderPreview(){ prev.innerHTML=renderMarkdown(area.value); fixFileRefs(prev); }
+  var hidePreview=false;
+  try{ hidePreview=localStorage.getItem("syswiki.hidePreview")==="1"; }catch(e){}
+  if(hidePreview) panes.classList.add("hide-preview");
+  function renderPreview(){
+    if(panes.classList.contains("hide-preview")) return;
+    prev.innerHTML=renderMarkdown(area.value); fixFileRefs(prev);
+  }
+  var tpBtn=$("edTogglePreview");
+  function updatePreviewToggle(){ tpBtn.textContent=panes.classList.contains("hide-preview")?"Show Preview":"Hide Preview"; }
+  updatePreviewToggle();
   renderPreview();
   area.addEventListener("input",renderPreview);
+  area.addEventListener("paste",function(e){ handleEditorPaste(e,area); });
   $("edSave").addEventListener("click",saveEditor);
   $("edCancel").addEventListener("click",function(){ var hp=homePage(); if(id) go(id); else if(hp) go(hp); });
   $("edAttach").addEventListener("click",openAttach);
+  $("edImage").addEventListener("click",openImage);
+  $("edPasteTable").addEventListener("click",pasteTable);
+  tpBtn.addEventListener("click",function(){
+    panes.classList.toggle("hide-preview");
+    try{ localStorage.setItem("syswiki.hidePreview", panes.classList.contains("hide-preview")?"1":"0"); }catch(e){}
+    updatePreviewToggle();
+    renderPreview();
+  });
   $("edBold").addEventListener("click",function(){ wrapSelection("**","**"); });
   $("edItalic").addEventListener("click",function(){ wrapSelection("*","*"); });
   $("edCode").addEventListener("click",function(){ wrapSelection("`","`"); });
   el.breadcrumb.innerHTML='<span class="crumb current">'+(page?("Editing — "+escapeHtml(page.title)):"New page")+'</span>';
-  document.title="Editing — SysWiki";
+  document.title="Editing — "+wikiName();
 }
 
 function wrapSelection(prefix,suffix){
@@ -575,6 +600,73 @@ function wrapSelection(prefix,suffix){
   area.setRangeText(prefix+sel+suffix,s,e,"end");
   area.focus();
   area.dispatchEvent(new Event("input"));
+}
+
+function insertTextAtCursor(area,text){
+  var pos=area.selectionStart;
+  area.setRangeText(text,pos,area.selectionEnd,"end");
+  area.focus();
+  area.dispatchEvent(new Event("input"));
+}
+
+function tsvToMarkdown(text){
+  var lines=String(text).replace(/\r\n/g,"\n").split("\n").filter(function(l){return l.trim()!=="";});
+  if(lines.length<2) return text;
+  var rows=lines.map(function(l){ return l.split("\t").map(function(c){return c.trim();}); });
+  var cols=0;
+  for(var i=0;i<rows.length;i++) cols=Math.max(cols,rows[i].length);
+  for(var j=0;j<rows.length;j++) while(rows[j].length<cols) rows[j].push("");
+  var widths=[];
+  for(var c=0;c<cols;c++){ var w=0; for(var r=0;r<rows.length;r++){ if(rows[r][c].length>w) w=rows[r][c].length; } widths.push(Math.max(w,3)); }
+  function pad(s,w){ s=s||""; while(s.length<w) s+=" "; return s; }
+  var out=[];
+  for(var r2=0;r2<rows.length;r2++){
+    var cells=[]; for(var c2=0;c2<cols;c2++) cells.push(pad(rows[r2][c2],widths[c2]));
+    out.push("| "+cells.join(" | ")+" |");
+    if(r2===0){
+      var sep=[]; for(var c3=0;c3<cols;c3++){ var dashes=""; for(var d=0;d<widths[c3];d++) dashes+="-"; sep.push(dashes); }
+      out.push("| "+sep.join(" | ")+" |");
+    }
+  }
+  return out.join("\n");
+}
+
+function handleEditorPaste(e,area){
+  var items=e.clipboardData&&e.clipboardData.items;
+  if(items){
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf("image/")===0){
+        var f=items[i].getAsFile();
+        if(f){
+          e.preventDefault();
+          addFile(f).then(function(id){ insertTextAtCursor(area,"![](file:"+id+")"); });
+          return;
+        }
+      }
+    }
+  }
+  var text=e.clipboardData?e.clipboardData.getData("text/plain"):"";
+  if(text && text.indexOf("\t")>=0){
+    var lines=text.replace(/\r\n/g,"\n").split("\n").filter(function(l){return l.trim()!=="";});
+    if(lines.length>=2){
+      e.preventDefault();
+      insertTextAtCursor(area,tsvToMarkdown(text));
+    }
+  }
+}
+
+function pasteTable(){
+  var area=$("edArea");
+  function done(text){
+    if(!text){ alert("Clipboard is empty or not accessible. Copy cells from Excel/Sheets first."); return; }
+    if(text.indexOf("\t")<0){ alert("Clipboard does not contain tab-separated cells."); return; }
+    insertTextAtCursor(area,tsvToMarkdown(text));
+  }
+  if(navigator.clipboard && navigator.clipboard.readText){
+    navigator.clipboard.readText().then(done).catch(function(){ alert("Clipboard access was denied. Paste directly into the editor instead — tabs auto-convert to a table."); });
+  } else {
+    alert("Clipboard API not available here. Paste directly into the editor instead — tabs auto-convert to a table.");
+  }
 }
 
 async function saveEditor(){
@@ -774,6 +866,54 @@ function toggleTheme(){
   updateThemeBtn();
 }
 
+/* ============================= wiki name ============================= */
+function wikiName(){
+  var n=null;
+  try{ n=localStorage.getItem("syswiki.name"); }catch(e){}
+  return (n&&n.trim())?n.trim():"SysWiki";
+}
+function setWikiName(n){
+  try{ localStorage.setItem("syswiki.name",n); }catch(e){}
+}
+function renderWikiTitle(){
+  el.wikiTitle.textContent=wikiName();
+}
+function startWikiRename(){
+  var h=el.wikiTitle;
+  var input=document.createElement("input");
+  input.className="wiki-title-input";
+  input.value=wikiName();
+  h.textContent="";
+  h.appendChild(input);
+  input.focus();
+  input.select();
+  var done=false;
+  function commit(){
+    if(done) return; done=true;
+    var v=input.value.trim();
+    if(v) setWikiName(v);
+    renderWikiTitle();
+    applyWikiNameToDoc();
+  }
+  function cancel(){
+    if(done) return; done=true;
+    renderWikiTitle();
+  }
+  input.addEventListener("keydown",function(e){
+    if(e.key==="Enter"){ e.preventDefault(); commit(); }
+    else if(e.key==="Escape"){ e.preventDefault(); cancel(); }
+  });
+  input.addEventListener("blur",commit);
+}
+function applyWikiNameToDoc(){
+  var p=currentId?getPage(currentId):null;
+  document.title=p?(p.title+" — "+wikiName()):wikiName();
+}
+function initWikiName(){
+  renderWikiTitle();
+  document.title=wikiName();
+}
+
 /* ============================= seed ============================= */
 async function seed(){
   var now=Date.now();
@@ -801,6 +941,7 @@ async function seed(){
 function bindEvents(){
   el.menuBtn.addEventListener("click",function(){ el.sidebar.classList.toggle("open"); });
   el.themeBtn.addEventListener("click",toggleTheme);
+  el.wikiTitle.addEventListener("click",startWikiRename);
   el.editBtn.addEventListener("click",function(){ if(currentId) location.hash="#/page/"+encodeURIComponent(currentId)+"/edit"; });
   el.deleteBtn.addEventListener("click",deleteCurrentPage);
   el.exportBtn.addEventListener("click",function(){ showModal("Export",[
@@ -867,12 +1008,18 @@ function openAttach(){
   el.attachInput.accept="*/*";
   el.attachInput.click();
 }
+function openImage(){
+  attachTarget=$("edArea");
+  el.attachInput.accept="image/*";
+  el.attachInput.click();
+}
 
 /* ============================= init ============================= */
 async function init(){
   await openDB();
   cacheEls();
   initTheme();
+  initWikiName();
   await loadPages();
   if(pages.length===0) await seed();
   await loadPages();
