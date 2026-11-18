@@ -114,7 +114,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .modal-btn{display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px}
 .modal-btn:hover{background:var(--hover)}
 .modal-table{width:560px;max-width:94vw}
-.table-preview{width:100%;height:220px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;resize:vertical;margin-bottom:12px}
+.table-preview{width:100%;height:140px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;resize:vertical;margin-bottom:8px}
+.table-render-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.table-render{max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:12px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end}
 
 @media(max-width:800px){
@@ -664,11 +666,16 @@ function showTablePreview(mdText){
   var html='<div class="modal-box modal-table">'
     +'<h3>Paste table — Markdown</h3>'
     +'<textarea id="tablePreviewArea" class="table-preview" spellcheck="false"></textarea>'
+    +'<div class="table-render-label">Preview</div>'
+    +'<div id="tablePreviewRender" class="markdown table-render"></div>'
     +'<div class="modal-actions"><button id="tableInsert" class="primary">Insert into editor</button><button id="tableCancel">Cancel</button></div>'
     +'</div>';
   el.modal.innerHTML=html;
-  var ta=$("tablePreviewArea");
+  var ta=$("tablePreviewArea"), render=$("tablePreviewRender");
   ta.value=mdText;
+  function updateRender(){ render.innerHTML=renderMarkdown(ta.value); }
+  updateRender();
+  ta.addEventListener("input",updateRender);
   ta.focus();
   ta.select();
   $("tableCancel").addEventListener("click",hideModal);
@@ -814,7 +821,7 @@ async function exportWiki(){
   for(var i=0;i<fs.length;i++){
     files[fs[i].id]={name:fs[i].name,type:fs[i].type,data:await blobToBase64(fs[i].blob)};
   }
-  var data={app:"syswiki",version:1,exportedAt:new Date().toISOString(),pages:ps,files:files};
+  var data={app:"syswiki",version:1,exportedAt:new Date().toISOString(),name:wikiName(),pages:ps,files:files};
   download("syswiki-backup-"+stamp()+".json",JSON.stringify(data,null,2),"application/json");
 }
 
@@ -844,6 +851,7 @@ async function importJson(file,replace){
       await put("files",{id:ids[j],name:f.name,type:f.type,blob:b64ToBlob(f.data,f.type)});
     }
   }
+  if(data.name){ setWikiName(data.name); renderWikiTitle(); }
   await refresh();
   go(homePage());
 }
